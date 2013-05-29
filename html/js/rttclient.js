@@ -26,7 +26,7 @@
  *   of Education, and you should not assume endorsement by the Federal Government.
  */
 
-var BOSH_SERVICE = '/rtt/service/http-bind';
+var BOSH_SERVICE = '/http-bind';
 
 Trophy.log.setLogLevel(Trophy.log.INFO);
 
@@ -43,57 +43,46 @@ function log(msg) {
 }
 
 var RosterGroup = function() {
-    this.index = {};
     this.items = [];
     this.length = 0;
 };
 
 RosterGroup.prototype = {
-    add: function(item, noupdate) {
+    add: function(item) {
         var jid = item.jid;
-        if (! this.index.hasOwnProperty(jid))
-            this.items.push(item);
-        else
-            this.items[this.index[jid]] = item;
-        if (! noupdate)
-            this.update();
+        this.items[jid] = item;
         return this;
     },
     
-    remove: function(item, noupdate) {
+    remove: function(item) {
         var jid = item.jid;
-        if (this.index.hasOwnProperty(jid)) {
-            this.items.splice(this.index[jid], 1);
-            if (! noupdate)
-                this.update();
-        }
+        if (this.items.hasOwnProperty(jid))
+            delete this.items[jid];
         return this;
-    },
-
-    getItem: function(i) {
-        return this.items[i];
     },
     
     hasItemByJID: function(jid) {
-        return this.index.hasOwnProperty(jid);
+        return this.items.hasOwnProperty(jid);
     },
     
     getItemByJID: function(jid) {
-        return this.items[this.index[jid]];
+        return this.items[jid];
     },
     
-    update: function() {
-        this.items.sort(function(a, b) {
-            a = Roster.getName(a);
-            b = Roster.getName(b);
+    getSorted: function() {
+        var sortedItems = [];
+        for (var k in this.items) {
+            if (this.items.hasOwnProperty(k))
+                sortedItems.push(this.items[k]);
+        }
+        sortedItems.sort(function(a, b) {
+            a = Roster.getName(a).toLowerCase();
+            b = Roster.getName(b).toLowerCase();
             if (a < b) return -1;
             else if (a == b) return 0;
             else return 1;
         });
-        this.length = this.items.length;
-        this.index = {};
-        for (var i = 0; i < this.length; i++)
-            this.index[this.items[i].jid] = i;
+        return sortedItems;
     },
 };
 
@@ -122,12 +111,10 @@ Roster.RTTSupport = {
 };
 
 Roster.prototype = {
-    set: function(items, rttQueryCallback) {
+    set: function(items) {
         this._clear();
         for (var i = 0; i < items.length; i++)
-            this.update(items[i], true, rttQueryCallback);
-        this.online.update();
-        this.offline.update();
+            this.update(items[i], true);
         if (this.changeListener !== null)
             this.changeListener();
         return this;
@@ -203,7 +190,7 @@ Roster.prototype = {
             var unknown = 0;
             for (var k in item.resources) {
                 if (item.resources.hasOwnProperty(k)) {
-                    var rttSupport = this.rttSupport[k];
+                    var rttSupport = this.rttSupport[jid + "/" + k];
                     if (rttSupport === Roster.RTTSupport.YES)
                         return rttSupport;
                     else if (rttSupport === Roster.RTTSupport.NO)
@@ -232,6 +219,7 @@ var RosterController = function(model, view, chatView, connection) {
     var delegate = this.view.getContainer();
     delegate.on("click.rttclient", "li.r", this, this._onRosterClick);
     this.connection.roster.registerCallback(this._rosterCallback.bind(this));
+    this.connection.caps.addChangeListener(this._capsCallback.bind(this));
 };
 
 RosterController.prototype = {
@@ -251,14 +239,15 @@ RosterController.prototype = {
     
     _rosterCallback: function(rosterItems, changedItem) {
         if (! changedItem) // we set entire roster
-            this.model.set(rosterItems, this._rttQueryCallback.bind(this));
+            this.model.set(rosterItems);
         else
-            this.model.update(changedItem, false, this._rttQueryCallback.bind(this));
+            this.model.update(changedItem, false);
     },
     
-    _rttQueryCallback: function(fullJID) {
-        this.model.updateRTTSupport(fullJID, Roster.RTTSupport.UNKNOWN);
-        // TBD: this.model.updateRTTSupport(fullJID, hasSupport? Roster.RTTSupport.YES : Roster.RTTSupport.NO);
+    _capsCallback: function(fromJID) {
+        var features = this.connection.caps.getCapabilitiesByJid(fromJID).features;
+        var hasRTT = features.hasOwnProperty(Strophe.NS.RTT);
+        this.model.updateRTTSupport(fromJID, hasRTT? Roster.RTTSupport.YES : Roster.RTTSupport.NO);
     },
     
     _onRosterGetSuccess: function(rosterActiveCallback, rosterItems) {
@@ -280,11 +269,13 @@ RosterController.prototype = {
 var ChatboxController = function(delegateTabView, selector, connection) {
     this.tabView = delegateTabView;
     this.connection = connection;
+    this.selector = selector;
     var delegate = this.tabView.getContainer();
     delegate.on("keypress.rttclient", selector, this, this.onKeypress);
     delegate.on("keyup.rttclient", selector, this, this.onKeyup);
     delegate.on("focus.rttclient", selector, this, this.onFocus);
     delegate.on("blur.rttclient", selector, this, this.onBlur);
+    delegate.on("tabclose.rttclient", this, this.onClose);
 };
 
 ChatboxController.prototype = {
@@ -342,6 +333,12 @@ ChatboxController.prototype = {
             event.data.onEdit(chatbox);
     },
 
+    onClose: function(event, tabContent) {
+        var allChatboxes = $(tabContent).parent().find(event.data.selector);
+        var thisChatbox = $(tabContent).find(allChatboxes);
+        thisChatbox.trigger("blur");
+    },
+    
     onSend: function(chatbox) {
         var div = chatbox.closest("div.mc");
         var chat = this.tabView.findById(div.attr("id"));
@@ -452,7 +449,8 @@ SessionController.prototype = {
         else if (status == Strophe.Status.CONNECTED) {
             log('Strophe is connected.');
             this.chatView.setMyJid(Strophe.getBareJidFromJid(this.connection.jid));
-            this.connection.send($pres().tree());
+            var pres = $pres().c("c", this.connection.caps.generateCapsAttrs());
+            this.connection.send(pres.tree());
             this.rosterController.connectionActive(this._onRosterSuccess.bind(this),
                     this._onRosterFailure.bind(this));
         }        
@@ -487,6 +485,12 @@ var RosterView = function(model, rosterNode) {
     this.toplevelNode = rosterNode;
     this.onlineNode = $(rosterNode).find("ul.roster-online");
     this.offlineNode = $(rosterNode).find("ul.roster-offline");
+    this.wasUpdated = false;
+    // Periodically check whether roster was updated
+    // Updating rosters immediately when a large number of items
+    // change is rather inefficient, and a 2-second delay won't be
+    // noticeable.
+    this.updateTimer = setInterval(this._checkUpdate.bind(this), 2000);
     this.setModel(model);
 };
 
@@ -508,46 +512,71 @@ RosterView.prototype = {
         this.model.setUpdateListener(this._onChangeItem.bind(this));
         this.model.setRTTStatusListener(this._onChangeRTT.bind(this));
     },
+
+    _checkUpdate: function() {
+        if (this.wasUpdated)
+            this._doChangeAll();
+    },
     
-    _onChangeAll: function() {
+    _doChangeAll: function() {
         this.nodeMap = {};
         this.idMap = {};
         this.nextId = 0;
+        this.wasUpdated = false;
         this.onlineNode.children().remove();
         this.offlineNode.children().remove();
         this._populateGroup(this.onlineNode, this.model.getGroup("online"));
         this._populateGroup(this.offlineNode, this.model.getGroup("offline"));
     },
+        
+    _onChangeAll: function() {
+        this._doChangeAll();
+    },
     
     _onChangeItem: function(item, wasOnline, nowOnline) {
-        if (! this.nodeMap.hasOwnProperty(item.jid)) {
-            var list = nowOnline? this.onlineNode : this.offlineNode;
-            this._newNode(list, item);
-        }
-        node = this.nodeMap[item.jid];
-        if (wasOnline != nowOnline) {
-            var newList = nowOnline? this.onlineNode : this.offlineNode;
-            node.detach();
-            newList.append(node);
-        }
+        this.wasUpdated = true;
     },
     
     _onChangeRTT: function(jid, rttStatus) {
-        
+        var item = this.model.getItemByJid(jid);
+        if (item) {
+            var rttStatus = this.model.hasRTTSupport(jid);
+            if (Roster.isOnline(this.model.getItemByJid(jid))) {
+                var liNode = this.nodeMap[jid];
+                if (liNode) {
+                    liNode.children('span.rtt').remove();
+                    if (rttStatus === Roster.RTTSupport.YES)
+                        liNode.prepend(this._makeRTTIcon());
+                }
+            }
+        }        
     },
     
     _populateGroup: function(list, group) {
-        for (var i = 0; i < group.length; i++)
-            this._newNode(list, group.getItem(i));
+        var items = group.getSorted();
+        for (var i = 0; i < items.length; i++)
+            this._newNode(list, items[i]);
     },
     
     _newNode: function(list, item) {
-        var liNode = $('<li class="r">').text(Roster.getName(item));
+        var name = item.name;
+        var jid = item.jid;
+        var tooltip = name? 'Name:\u00a0' + name + '\u000a' :  '';
+        tooltip += 'Id:\u00a0' + jid;
+        var spanNode = $('<span>').attr("title", tooltip).text(Roster.getName(item));
+        var liNode = $('<li class="r">').append(spanNode);
+        if (Roster.isOnline(item) && this.model.hasRTTSupport(item.jid) == Roster.RTTSupport.YES) {
+            liNode.prepend(this._makeRTTIcon());
+        }
         var id = "ro" + this.nextId++;
         liNode.attr("id", id);
         list.append(liNode);
         this.nodeMap[item.jid] = liNode;
         this.idMap[id] = item.jid;
+    },
+    
+    _makeRTTIcon: function() {
+        return $('<span class="rtt" title="This user has real-time text enabled">(RTT) </span>');
     },
 };
 
@@ -689,9 +718,12 @@ TabsView.prototype = {
     },
     
     close: function(tabNode) {
-        var panelId = tabNode.remove().attr("aria-controls");
+        var panelId = tabNode.attr("aria-controls");
         var jid = this.JidById[panelId];
-        this.tabsByJid[jid].remove();
+        var tabContent = this.tabsByJid[jid];
+        this.node.trigger("tabclose", this.node.children('#' + panelId));
+        tabNode.remove();
+        tabContent.remove();
         delete this.tabsByJid[jid];
         delete this.JidById[panelId];
         this.node.tabs("refresh");
@@ -778,7 +810,7 @@ $(document).ready(function() {
             });
     
     // Uncomment the following line to see all the debug output.
-    //Strophe.log = function (level, msg) { log('LOG: ' + msg); };
+    Strophe.log = function (level, msg) { log('LOG: ' + msg); };
     $("#connect").button();
     $("#disconnect").button();
     

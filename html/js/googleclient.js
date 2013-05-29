@@ -130,7 +130,7 @@ Roster.prototype = {
         return this;
     },
     
-    update: function(item, noupdate) {
+    update: function(item, noupdate, rttQueryCallback) {
         this.jidIndex[item.jid] = item;
         var onlineCount = 0;
         var nowOnline = false;
@@ -138,17 +138,22 @@ Roster.prototype = {
         for (var k in item.resources) {
             if (item.resources.hasOwnProperty(k)) {
                 onlineCount++;
+                if (! this.rttSupport.hasOwnProperty(k) && rttQueryCallback) {
+                    // Querying for RTT support is a controller function, and thus
+                    // mast be handled by the controller, rather than here.
+                    rttQueryCallback(k);
+                }
             }
         }
         if (onlineCount > 0) {
             nowOnline = true;
-            this.online.add(item);
-            this.offline.remove(item);
+            this.online.add(item, noupdate);
+            this.offline.remove(item, noupdate);
         }
         else {
             nowOnline = false;
-            this.offline.add(item);
-            this.online.remove(item);
+            this.offline.add(item, noupdate);
+            this.online.remove(item, noupdate);
         }
         if (! noupdate && this.updateListener !== null)
             this.updateListener(item, wasOnline, nowOnline);

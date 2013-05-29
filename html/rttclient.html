@@ -36,9 +36,12 @@
 -->
 <script type="text/javascript" src="js/jquery-1.9.1.js"></script>
 <script type="text/javascript" src="js/jquery-ui-1.10.2.custom.min.js"></script>
+<script type="text/javascript" src="js/sha1.js"></script>
 <script type="text/javascript" src="js/strophe.js"></script>
 <script type="text/javascript" src="js/strophe.roster.js"></script>
-<script type="text/javascript" src="../trophy.js"></script>
+<script type="text/javascript" src="js/strophe.disco.js"></script>
+<script type="text/javascript" src="js/strophe.caps.js"></script>
+<script type="text/javascript" src="js/trophy.js"></script>
 <script type="text/javascript" src="js/rttclient.js"></script>
 <link type="text/css" rel="stylesheet" href="css/tap/jquery-ui-1.10.2.custom.min.css">
 <link type="text/css" rel="stylesheet" href="css/rttclient.css">
@@ -56,17 +59,11 @@
     <div id="login">
       <form id="cred" name="cred">
         <label for="jid">User ID:</label><br>
-        <input type="text" id="jid" value="@tap"><br>
+        <input type="text" id="jid" value="christian@tap-im"><br>
         <label for="pass">Password:</label><br>
         <input type="password" id='pass'><br>
         <button type="submit" id="connect">Connect</button>
       </form>
-      <p>For quick testing, you can log in with one of these guest accounts:</p>
-      <ul>
-        <li>rtt1@tap</li>
-        <li>rtt2@tap</li>
-      </ul>
-      <p>The password is "rtt" in lowercase for all these accounts.</p>
     </div>
     <div id="roster-div">
       <div id="roster">
