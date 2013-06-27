@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+<!--
+ rttclient.js - A demonstration IM client for Trophy.js
+ Copyright © 2013 Christian Vogler
+ 
+ BROWSER COMPATIBILITY:
+  Tested: Chrome 25, Firefox 19, Safari 5, Safari 6, IE9, Opera 12
+  Tested within limits: Android 4.1 browser, Safari 6 on iOS
+  Targeted (but untested): IE8, IE10
+ 
+ LICENSE:
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at: http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+  
+ ACKNOWLEDGMENTS:
+  The development of this code was in part supported by funding from the
+  National Institute on Disability and Rehabilitation Research, U.S. Department
+  of Education, grant number H133E090001 (RERC on Telecommunications Access).
+  However, this work does not necessarily represent the policy of the Department
+  of Education, and you should not assume endorsement by the Federal Government.
+-->
+<Title>Real-time text Chat Client</title>
+<!--
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.10.2/jquery-ui.min.js"></script>
+-->
+<script type="text/javascript" src="js/jquery-1.9.1.js"></script>
+<script type="text/javascript" src="js/jquery-ui-1.10.2.custom.min.js"></script>
+<script type="text/javascript" src="js/strophe.js"></script>
+<script type="text/javascript" src="js/strophe.roster.js"></script>
+<script type="text/javascript" src="../../trophy.js"></script>
+<script type="text/javascript" src="js/rttclient.js"></script>
+<link type="text/css" rel="stylesheet" href="css/tap/jquery-ui-1.10.2.custom.min.css">
+<link type="text/css" rel="stylesheet" href="css/rttclient.css">
+</head>
+<body>
+  <div id="main">
+  <div id="logo"><a href="http://www.gallaudet.edu"><img src="img/taplogo-web-h.jpg" alt="Gallaudet's new logo with TAP wording " width="582" height="100"></a></div>
+  <div id="back"><a href="index.html">Back to real-time text page</a></div>
+  <div id="app-container">
+  <div id="app">
+  <div id="roster-container" class="ui-widget ui-widget-content ui-corner-all">
+    <div id="roster-title" class="ui-widget-header ui-corner-all">
+      <span id="roster-title-text">Login</span>
+    </div>
+    <div id="login">
+      <form id="cred" name="cred">
+        <label for="jid">User ID:</label><br>
+        <input type="text" id="jid" value="@tap"><br>
+        <label for="pass">Password:</label><br>
+        <input type="password" id='pass'><br>
+        <button type="submit" id="connect">Connect</button>
+      </form>
+      <p>For quick testing, you can log in with one of these guest accounts:</p>
+      <ul>
+        <li>rtt1@tap</li>
+        <li>rtt2@tap</li>
+      </ul>
+      <p>The password is "rtt" in lowercase for all these accounts.</p>
+    </div>
+    <div id="roster-div">
+      <div id="roster">
+      	<ul>
+      		<li>Online Users
+      		<ul class="roster-online">
+      		  <li>Here</li>
+      		</ul></li>
+      		<li>Offline Users
+      		<ul class="roster-offline">
+      		  <li>There</li>
+      		</ul></li>
+      	</ul>
+      </div>
+      <button id="disconnect">Disconnect</button>
+    </div>  
+  </div>
+  <div id="messages-tabs">
+    <ul class="closable-tabs">
+      <li><a href="#mc1">User 1</a><span class="ui-icon ui-icon-close" role="presentation">Remove Tab</span></li>
+      <li><a href="#mc2">User 2</a><span class="ui-icon ui-icon-close" role="presentation">Remove Tab</span></li>
+    </ul>
+    <div id="mc1" class="mc">
+      <div class="msgbox">Tab 1</div>
+      <textarea class="chatbox"></textarea>
+    </div>
+    <div id="mc2" class="mc">
+      <div class="msgbox">Tab 2</div>
+      <textarea class="chatbox"></textarea>
+    </div>
+  </div>
+  </div>
+  </div>
+  <div id="footer">
+  <!-- <a href="http://validator.w3.org/check?uri=http%3A%2F%2Ftap.gallaudet.edu%2Frtt%2Fgoogleclient.html">Valid HTML5</a> -->
+  <br>&copy; Copyright 2013 by the <a href="http://tap.gallaudet.edu">Technology Access Program</a> - All Rights Reserved
+  </div>
+  </div>  
+  <div id='log' style="display: none;"><h1>Log</h1></div>
+</body>
+
