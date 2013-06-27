@@ -10,6 +10,11 @@ Real-time text is text transmitted instantly while it is being typed or created.
 
 See the [Real Time Text Task Force] (http://www.realtimetext.org/) site for more information. See the [Real Jabber site] (http://www.realjabber.org/) for more information on using real-time text with Instant Messaging, utilizing the XMPP Extension Protocol standard [XEP-0301] (http://www.xmpp.org/extensions/xep-0301.html). This standard has been authored by Mark Rejhon and co-authored by Gunnar Hellström.
 
+Live demonstration
+------------------
+
+Live demonstrations of this code in action with both a standalone XMPP server and Google Talk can be viewed on the Technology Access Program's [Real-time text page] (http://tap.gallaudet.edu/rtt/).
+
 License
 -------
 
