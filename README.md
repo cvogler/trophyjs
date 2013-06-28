@@ -13,7 +13,7 @@ See the [Real Time Text Task Force] (http://www.realtimetext.org/) site for more
 Live demonstration
 ------------------
 
-Live demonstrations of this code in action with both a standalone XMPP server and Google Talk can be viewed on the Technology Access Program's [Real-time text page] (http://tap.gallaudet.edu/rtt/).
+Live demonstrations of this code in action with both a standalone XMPP server and Google Talk can be viewed on the Technology Access Program at Gallaudet University on the [Real-time text page] (http://tap.gallaudet.edu/rtt/).
 
 License
 -------
