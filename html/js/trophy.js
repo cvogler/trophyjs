@@ -342,11 +342,14 @@ Trophy.WallClockEventQueue.prototype = {
      * Clears the queue. Does not affect the running status of the queue.
      * Pending hasMore callbacks are discarded.
      * 
+     * @param {Integer} lastInsertionTime if defined, set the last insertion
+     *                  time to this, else to the current time.
      * @returns {Trophy.WallClockEventQueue} this queue
      */
-    clear : function() {
+    clear : function(lastInsertionTime) {
         this._stopTimer();
         this.queue = [];
+        this.lastInsertionTime = _undefined(lastInsertionTime)? new Date().getTime() : lastInsertionTime;
         return this;
     },
 
@@ -855,7 +858,9 @@ Trophy.RTTBuffer.prototype = {
     // per the spec.
     _restart : function(eventType, timebase) {
         this.syncTime(timebase);
-        this.eventQueue.clear();
+        // We must pass the time base for clearing, because there could
+        // be a clock tick between the sync and the clearing of the queue.
+        this.eventQueue.clear(timebase);
         if (!this.eventQueue.isRunning()) {
             this.pendingEditEvents = false;
             this._triggerEvents(ev.START_RTT);

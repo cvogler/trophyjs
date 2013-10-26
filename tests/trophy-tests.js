@@ -2007,6 +2007,156 @@ asyncTest("trophy.RTTPlugin receive", function() {
     }, 50);
 });
 
+
+_rttContinueStanza5 = "\
+    <message to='juliet@capulet.lit' from='romeo@montague.lit/orchard' type='chat' id='a15'>\
+    <rtt xmlns='urn:xmpp:rtt:0' event='edit' seq='1236'>\
+      <w n='20'/>\
+      <t> </t>\
+      <w n='50'/>\
+      <t>is!</t>\
+    </rtt>\
+    </message>\
+";
+
+_rttBodyStanza5 = "\
+    <message to='juliet@capulet.lit' from='romeo@montague.lit/orchard' type='chat' id='a16'>\
+    <body>my dear 𝒥uliet! This! is!</body>\
+    </message>\
+";
+
+_rttNewStanza5 = "\
+    <message to='juliet@capulet.lit' from='romeo@montague.lit/orchard' type='chat' id='a06'>\
+    <rtt xmlns='urn:xmpp:rtt:0' seq='1234' event='reset'>\
+      <t>Hello</t>\
+      <w n='40'/>\
+      <t> there!</t>\
+    </rtt>\
+    </message>\
+";
+
+asyncTest("trophy.RTTPlugin receive pileup", function() {
+    expect(51);
+    var timebase = new Date().getTime();
+    var seq = 0;
+    var handler = function(jid, event, text, context) {
+        switch (seq) {
+        case 0:
+            QUnit.step(1);
+            deepEqual(event, Trophy.Event.START_RTT, "start rtt");
+            deepEqual(text, "", "empty string");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 1:
+            QUnit.step(2);
+            deepEqual(event, Trophy.Event.RESET, "reset");
+            deepEqual(context.getRTTBuffer().getText().toString(), "", "empty string");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 2:
+            QUnit.step(3);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "Hello, my 𝒥uliet!", "expect string: Hello, my 𝒥uliet!");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 3:
+            QUnit.step(4);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(context.getRTTBuffer().getText().toString(), "Hello, my 𝒥uliet! ", "expect string: Hello, my 𝒥uliet! ");
+            _checkTimes(timebase + 100);
+            seq++;
+            break;
+        case 4:
+            QUnit.step(5);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(context.getRTTBuffer().getText().toString(), "Hello, my 𝒥uliet! T", "expect string: Hello, my 𝒥uliet! T");
+            _checkTimes(timebase + 150);
+            seq++;
+            break;
+        case 5:
+            QUnit.step(6);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "Hello, my 𝒥uliet! This!", "expect string: Hello, my 𝒥uliet! This!");
+            _checkTimes(timebase + 180);
+            seq++;
+            break;
+        case 6:
+            QUnit.step(7);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my 𝒥uliet! This!", "expect string: my 𝒥uliet! This!");
+            _checkTimes(timebase + 220);
+            seq++;
+            break;
+        case 7:
+            QUnit.step(8);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my dear 𝒥uliet! This!", "expect string: my dear 𝒥uliet! This!");
+            _checkTimes(timebase + 250);
+            seq++;
+            break;
+        case 8:
+            QUnit.step(9);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my dear 𝒥uliet! This! ", "expect string: my dear 𝒥uliet! This! ");
+            _checkTimes(timebase + 270);
+            seq++;
+            break;
+        case 9:
+            QUnit.step(10);
+            deepEqual(event, Trophy.Event.BODY, "rtt body");
+            deepEqual(text, "my dear 𝒥uliet! This! is!", "expect string: my dear 𝒥uliet! This! is!");
+            _checkTimes(timebase + 320);
+            seq++;
+            break;
+        case 10:
+            QUnit.step(11);
+            deepEqual(event, Trophy.Event.RESET, "reset");
+            _checkTimes(timebase + 370);
+            seq++;
+            break;
+        case 11:
+            QUnit.step(12);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "Hello", "expect string: Hello");
+            _checkTimes(timebase + 370);
+            seq++;
+            break;
+        case 12:
+            QUnit.step(13);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "Hello there!", "expect string: Hello, there!");
+            _checkTimes(timebase + 410);
+            seq++;
+            break;
+        default:
+            ok(false, "We should never fall through these cases");
+        };
+    };
+    var conn = new _DummyConnection();
+    conn.rtt.setDefaultReceiveEventHandler(handler);
+    conn.connect();
+    conn.receive(_rttNewStanza2);
+    setTimeout(function() {
+        conn.receive(_rttContinueStanza3);
+        setTimeout(function() {
+            conn.receive(_rttContinueStanza5);
+            setTimeout(function() {
+                conn.receive(_rttBodyStanza5);
+                setTimeout(function() {
+                    conn.receive(_rttNewStanza5);
+                    setTimeout(function() {
+                        conn.disconnect();
+                        start();
+                    }, 200);
+                }, 50)
+            }, 50);
+        }, 150);
+    }, 100);
+});
+
 asyncTest("trophy.RTTPlugin receive edit", function() {
     expect(30);
     var seq = 0;
