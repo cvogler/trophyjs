@@ -80,7 +80,12 @@ Trophy = {
         WARN: 2,
         ERROR: 3,
         OFF: 4
-    }
+    },
+    
+    /**
+     * Maximum action queue backlog in milliseconds
+     */
+    MAX_QUEUE_BACKLOG : 1000
 };
 
 // Internal shorthands for the event and action namespaces
@@ -308,7 +313,8 @@ Trophy.stringDiff = function(oldStr, newStr) {
  * Constructor: Trophy.WallClockEventQueue
  */
 Trophy.WallClockEventQueue = function() {
-    this.lastInsertionTime = new Date().getTime();
+    this.timeBase = new Date().getTime();
+    this.lastInsertionOffset = 0;
     this.queue = [];
     this.timer = null;
     this.isStarted = false;
@@ -349,7 +355,7 @@ Trophy.WallClockEventQueue.prototype = {
     clear : function(lastInsertionTime) {
         this._stopTimer();
         this.queue = [];
-        this.lastInsertionTime = _undefined(lastInsertionTime)? new Date().getTime() : lastInsertionTime;
+        this.lastInsertionOffset = _undefined(lastInsertionTime)? new Date().getTime() - this.timeBase : lastInsertionTime - this.timeBase;
         return this;
     },
 
@@ -369,14 +375,14 @@ Trophy.WallClockEventQueue.prototype = {
      * @returns {Trophy.WallClockEventQueue} this queue
      */
     enqueue : function(targetTime, callback) {
-        if (targetTime < this.lastInsertionTime)
+        if (targetTime < this.timeBase + this.lastInsertionOffset)
             throw 'Trophy.TimeOrderingViolation: ' + targetTime + ' < '
-                    + this.lastInsertionTime;
+                    + (this.timeBase + this.lastInsertionOffset);
         this.queue.push({
-            targetTime : targetTime,
+            targetTime : targetTime - this.timeBase,
             callback : callback
         });
-        this.lastInsertionTime = targetTime;
+        this.lastInsertionOffset = targetTime - this.timeBase;
         this._startTimer();
         return this;
     },
@@ -408,6 +414,19 @@ Trophy.WallClockEventQueue.prototype = {
     length : function() {
         return this.queue.length;
     },
+    
+    /**
+     * @ returns {Integer} the backlog in this queue in milliseconds
+     */
+    backlog : function() {
+        var backlog = 0;
+        var len = this.queue.length;
+        if (len > 0) {
+            var now = new Date().getTime();
+            backlog = this.timeBase + this.queue[len - 1].targetTime - now;
+        }
+        return backlog;
+    },
 
     /**
      * @returns {Object} the first callback in the queue, or null if the
@@ -421,11 +440,35 @@ Trophy.WallClockEventQueue.prototype = {
         return this.queue.length > 0 ? this.queue[0] : null;
     },
     
+    /**
+     * Reduces the backlog. Any items that are backlogged more than the new
+     * maximum backlog will be triggered immediately.
+     * 
+     * @param maxBacklog {Integer} the maximum backlog the queue can have
+     *          after this call. If the backlog is less than this value,
+     *          this function is a no-op.
+     * @returns {Trophy.WallClockEventQueue} this queue
+     */
+    reduceBacklog : function(maxBacklog) {
+        var len = this.queue.length;
+        if (len > 0) {
+            var now = new Date().getTime();
+            var backlog = this.timeBase + this.queue[len - 1].targetTime - now;
+            if (backlog > maxBacklog) {
+                this.timeBase -= backlog - maxBacklog;
+                // Restart timer to ensure that any now-pending events are triggered
+                this._stopTimer();
+                this._startTimer();
+            }
+        }
+        return this;
+    },
+    
     // Private function: starts the event queue's timer
     _startTimer : function() {
         var that = this;
         if (that.isStarted && that.timer === null && that.queue.length > 0) {
-            var delta = Math.max(1, that.queue[0].targetTime
+            var delta = Math.max(1, this.timeBase + that.queue[0].targetTime
                     - (new Date().getTime()));
             that.timer = setTimeout(function() {
                 that.timer = null;
@@ -450,12 +493,12 @@ Trophy.WallClockEventQueue.prototype = {
         // we recheck the conditions here, because during a callback in the
         // loop, the queue
         // could have been manipulated.
-        while (this.queue.length > 0 && this.queue[0].targetTime <= now) {
+        while (this.queue.length > 0 && this.timeBase + this.queue[0].targetTime <= now) {
             var top = this.queue[0];
             this.queue.shift();
             var hasMore = this.queue.length > 0
-                    && this.queue[0].targetTime <= now;
-            top.callback(top.targetTime, hasMore);
+                    && this.timeBase + this.queue[0].targetTime <= now;
+            top.callback(this.timeBase + top.targetTime, hasMore);
         }
     }
 };
@@ -852,6 +895,16 @@ Trophy.RTTBuffer.prototype = {
         this.timebase = Math.max(timebase, this.timebase + this.timeOffset);
         this.timeOffset = 0;
     },
+    
+    /**
+     * Eliminates the excess backlog in this buffer's action queue.
+     * By default this is the value of Trophy.MAX_QUEUE_BACKLOG.
+     */
+    eliminateExcessBacklog : function(maxBacklog) {
+        if (_undefined(maxBacklog))
+            maxBacklog = Trophy.MAX_QUEUE_BACKLOG;
+        this.eventQueue.reduceBacklog(maxBacklog);
+    },
 
     // Private function: (re)starts the action queue after a new/reset
     // It captures the common processing rule between event=new/reset as
@@ -1179,6 +1232,7 @@ Trophy.RTTContext.prototype = {
                 that._decodeBody(elem);
             }
         });
+        this.rttBuffer.eliminateExcessBacklog();
         this.fullJID = fullJID;
         return this;
     },

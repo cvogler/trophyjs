@@ -71,6 +71,10 @@ function _compareRTT(testMsg, refMsg, expectedSeq) {
     return parseInt(seq);
 };
 
+var _undefined = function(arg) {
+    return typeof arg === 'undefined';
+};
+
 function _checkTimes(expected) {
     var actual = new Date().getTime();
     var tolerance = 25;
@@ -79,10 +83,15 @@ function _checkTimes(expected) {
                     + ")");
 };
 
-function _checkDelay(expected, actual) {
-    var tolerance = 35;
+function _checkDelay(expected, actual, tolerance, message) {
+    if (_undefined(tolerance))
+        tolerance = 35;
+    if (_undefined(message))
+        message = "";
+    else
+        message = message + ": ";
     ok(actual >= expected - tolerance && actual <= expected + tolerance,
-            "delay is within expected time: " + expected + " (actual: " + actual
+            message + "delay is within expected time: " + expected + " (actual: " + actual
                     + ")");
 };
 
@@ -188,7 +197,7 @@ test("Trophy.WallClockEventQueue.enqueue", function() {
     deepEqual(queue.length(), 1, "length is 1 after enqueue");
     ok(!queue.isRunning(), "Queue is not running after length()");
     deepEqual(queue.top(), {
-        targetTime : now + 4711,
+        targetTime : 4711,
         callback : fun
     }, "top element has timecode now + 4711");
     ok(!queue.isRunning(), "Queue is not running after top()");
@@ -196,7 +205,7 @@ test("Trophy.WallClockEventQueue.enqueue", function() {
     deepEqual(queue.length(), 3, "length is 3 after double enqueue");
     ok(!queue.isRunning(), "Queue is not running after double enqueue");
     deepEqual(queue.top(), {
-        targetTime : now + 4711,
+        targetTime : 4711,
         callback : fun
     }, "top is still now + 4711 after double enqueue");
     ok(!queue.isRunning(), "Queue is not running after top()");
@@ -216,21 +225,21 @@ test("Trophy.WallClockEventQueue.dequeue", function() {
     ok(!queue.isRunning(), "Queue is not running after triple enqueue()");
     deepEqual(queue.length(), 3, "length is 3 after triple enqueue");
     deepEqual(queue.top(), {
-        targetTime : now + 4711,
+        targetTime : 4711,
         callback : fun
     }, "top element has timecode now + 4711");
     deepEqual(queue, queue.dequeue(), "dequeue() returns queue");
     ok(!queue.isRunning(), "Queue is not running after dequeue()");
     deepEqual(queue.length(), 2, "length is 2 after dequeue");
     deepEqual(queue.top(), {
-        targetTime : now + 4712,
+        targetTime : 4712,
         callback : fun
     }, "top element has timecode now + 4712");
     queue.dequeue();
     ok(!queue.isRunning(), "Queue is not running after dequeue()");
     deepEqual(queue.length(), 1, "length is 1 after dequeue");
     deepEqual(queue.top(), {
-        targetTime : now + 4712,
+        targetTime : 4712,
         callback : fun2
     }, "top element has timecode now + 4712");
     queue.dequeue();
@@ -245,7 +254,7 @@ test("Trophy.WallClockEventQueue.dequeue", function() {
     ok(!queue.isRunning(), "Queue is not running after new enqueue()");
     deepEqual(queue.length(), 1, "length is 1 after new enqueue");
     deepEqual(queue.top(), {
-        targetTime : now + 4713,
+        targetTime : 4713,
         callback : fun
     }, "top element has timecode now + 4713");
 });
@@ -567,6 +576,107 @@ asyncTest(
             });
             queue.start();
         });
+
+asyncTest("Trophy.WallClockEventQueue backlog", function() {
+    expect(15);
+    var queue = new Trophy.WallClockEventQueue();
+    deepEqual(queue.backlog(), 0, "queue backlog is 0");
+    var now = new Date().getTime();
+    queue.enqueue(now + 10,
+            function(targetTime, hasMore) {
+                deepEqual(targetTime, now + 10,
+                        "target time is same as enqueued time");
+                var newNow = new Date().getTime();
+                deepEqual(queue.backlog(), now + 100 - newNow, "queue backlog is 90 ms from target time");
+                ok(newNow >= targetTime,
+                        "current time >= target time");
+                ok(!hasMore, "No more elements pending in queue");
+                deepEqual(queue.length(), 1,
+                        "Queue is not empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+            });
+    deepEqual(queue.backlog(), 10, "queue backlog is 10");
+    queue.enqueue(now + 100,
+            function(targetTime, hasMore) {
+                deepEqual(targetTime, now + 100,
+                        "target time is same as enqueued time");
+                deepEqual(queue.backlog(), 0, "no more backlog in queue");
+                ok(new Date().getTime() >= targetTime,
+                        "current time >= target time");
+                ok(!hasMore, "No more elements pending in queue");
+                deepEqual(queue.length(), 0, "Queue is empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+                start();
+            });
+    deepEqual(queue.backlog(), 100, "queue backlog is 100");
+    queue.start();
+});
+
+asyncTest("Trophy.WallClockEventQueue backlog reduce", function() {
+    expect(29);
+    var queue = new Trophy.WallClockEventQueue();
+    deepEqual(queue.backlog(), 0, "queue backlog is 0");
+    queue.reduceBacklog(200);
+    deepEqual(queue.backlog(), 0, "queue backlog is 0 after reduce by 200");
+    var now = new Date().getTime();
+    queue.enqueue(now + 200,
+            function(targetTime, hasMore) {
+                _checkDelay(targetTime, now - 350, 3,
+                        "target time is -350 ms past due to backlog reduction");
+                var newNow = new Date().getTime();
+                _checkDelay(queue.backlog(), now + 150 - newNow, 3, "queue backlog is 150 ms from target time");
+                ok(new Date().getTime() >= targetTime,
+                "   current time >= target time");
+                ok(hasMore, "Has one more element pending in queue");
+                deepEqual(queue.length(), 3,
+                        "Queue is not empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+            });
+    queue.enqueue(now + 300,
+            function(targetTime, hasMore) {
+                _checkDelay(targetTime, now - 250, 3,
+                        "target time is -250 ms past due to backlog reduction");
+                var newNow = new Date().getTime();
+                _checkDelay(queue.backlog(), now + 150 - newNow, 3, "queue backlog is 150 ms from target time");
+                ok(new Date().getTime() >= targetTime,
+                        "current time >= target time");
+                ok(!hasMore, "Has no more elements pending in queue");
+                deepEqual(queue.length(), 2,
+                        "Queue is not empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+            });
+    queue.enqueue(now + 600,
+            function(targetTime, hasMore) {
+                _checkDelay(targetTime, now + 50, 3,
+                        "target time is 50 ms past due to backlog reduction");
+                var newNow = new Date().getTime();
+                _checkDelay(queue.backlog(), now + 150 - newNow, 3, "queue backlog is 100 ms from target time");
+                ok(new Date().getTime() >= targetTime,
+                    "current time >= target time");
+                ok(!hasMore, "Has no more elements pending in queue");
+                deepEqual(queue.length(), 1,
+                        "Queue is not empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+            });
+    queue.enqueue(now + 700,
+            function(targetTime, hasMore) {
+                _checkDelay(targetTime, now + 150, 3,
+                        "target time is 100 ms past due to backlog reduction");
+                deepEqual(queue.backlog(), 0, "no more backlog in queue");
+                ok(new Date().getTime() >= targetTime,
+                        "current time >= target time");
+                ok(!hasMore, "No more elements pending in queue");
+                deepEqual(queue.length(), 0, "Queue is empty after callback");
+                ok(queue.isRunning(), "Queue is still running");
+                start();
+            });
+    _checkDelay(queue.backlog(), 700, 3, "queue backlog is 700");
+    queue.start();
+    queue.reduceBacklog(1000);
+    _checkDelay(queue.backlog(), 700, 3, "queue backlog is 700 after reduce 1000");
+    queue.reduceBacklog(150);
+    _checkDelay(queue.backlog(), 150, 3, "queue backlog is 150 after reduce 150");
+});
 
 // --------------------------------------
 
@@ -2154,6 +2264,116 @@ asyncTest("trophy.RTTPlugin receive pileup", function() {
                 }, 50)
             }, 50);
         }, 150);
+    }, 100);
+});
+
+_rttContinueStanza6 = "\
+    <message to='juliet@capulet.lit' from='romeo@montague.lit/orchard' type='chat' id='a08'>\
+    <rtt xmlns='urn:xmpp:rtt:0' seq='1235'>\
+      <t> </t>\
+      <w n='50'/>\
+      <t>Tx</t>\
+      <e/>\
+      <w n='30'/>\
+      <t>his!</t>\
+      <w n='40'/>\
+      <e p='7' n='7'/>\
+      <w n='30'/>\
+      <t p='2'> dear</t>\
+      <w n='550'/>\
+    </rtt>\
+    </message>\
+";
+
+_rttContinueStanza7 = "\
+    <message to='juliet@capulet.lit' from='romeo@montague.lit/orchard' type='chat' id='a09'>\
+    <rtt xmlns='urn:xmpp:rtt:0' seq='1236'>\
+      <t> </t>\
+      <w n='250'/>\
+      <t>it</t>\
+      <e/>\
+      <w n='300'/>\
+      <t>s!</t>\
+    </rtt>\
+    </message>\
+";
+
+asyncTest("trophy.RTTPlugin receive backlog", function() {
+    expect(28);
+    var timebase = new Date().getTime();
+    var seq = 0;
+    var handler = function(jid, event, text, context) {
+        switch (seq) {
+        case 0:
+            QUnit.step(1);
+            deepEqual(event, Trophy.Event.START_RTT, "start rtt");
+            deepEqual(text, "", "empty string");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 1:
+            QUnit.step(2);
+            deepEqual(event, Trophy.Event.RESET, "reset");
+            deepEqual(context.getRTTBuffer().getText().toString(), "", "empty string");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 2:
+            QUnit.step(3);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "Hello, my 𝒥uliet!", "expect string: Hello, my 𝒥uliet!");
+            _checkTimes(timebase);
+            seq++;
+            break;
+        case 3:
+            QUnit.step(4);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            // the backlog at this point is being reduced, so the next few edits in the RTT message
+            // are combined into one
+            deepEqual(text, "my dear 𝒥uliet! This!", "expect string: my dear 𝒥uliet! This!");
+            _checkTimes(timebase + 100);
+            seq++;
+            break;
+        case 4:
+            QUnit.step(5);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my dear 𝒥uliet! This! ", "expect string: my dear 𝒥uliet! This! ");
+            // Normally, this would be 800, but the backlog monitoring should reduce it
+            // by 250
+            _checkTimes(timebase + 800 - 250);
+            seq++;
+            break;
+        case 5:
+            QUnit.step(6);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my dear 𝒥uliet! This! i", "expect string: my dear 𝒥uliet! This! i");
+            // Normally, this would be 1050, but the backlog monitoring should reduce it
+            _checkTimes(timebase + 1050 - 250);
+            seq++;
+            break;
+        case 6:
+            QUnit.step(7);
+            deepEqual(event, Trophy.Event.EDIT, "rtt edit");
+            deepEqual(text, "my dear 𝒥uliet! This! is!", "expect string: my dear 𝒥uliet! This! is!");
+            // Normally, this would be 1350, but the backlog monitoring should reduce it
+            _checkTimes(timebase + 1350 - 250);
+            seq++;
+            break;
+        default:
+            ok(false, "We should never fall through these cases");
+        };
+    };
+    var conn = new _DummyConnection();
+    conn.rtt.setDefaultReceiveEventHandler(handler);
+    conn.connect();
+    conn.receive(_rttNewStanza2);
+    setTimeout(function() {
+        conn.receive(_rttContinueStanza6);
+        conn.receive(_rttContinueStanza7);
+        setTimeout(function() {
+            conn.disconnect();
+            start();
+        }, 1180);
     }, 100);
 });
 
