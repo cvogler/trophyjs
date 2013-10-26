@@ -48,7 +48,7 @@ Trophy = {
     /**
      * Version
      */
-    VERSION: "0.1",
+    VERSION: "0.2",
     
     /**
      * Public event types
@@ -1579,7 +1579,7 @@ Trophy.RTTPlugin = function(connection, defaultReceiveEventHandler) {
     /**
      * XEP-0301 specification version
      */
-    this.VERSION = "0.8";
+    this.VERSION = "1.0";
     this.init(connection);
     this.setDefaultReceiveEventHandler(defaultReceiveEventHandler);
 
