@@ -1,0 +1,18 @@
+Version 0.1
+===========
+* Initial release
+
+Version 0.2
+===========
+* Bump version numbers for Trophy.js 0.2 and XEP-0301 draft standard 1.0.
+
+* Implement action queue backlog monitoring.
+    This ensures that RTT is never than 1000 ms behind, even if
+    multiple stanzas are bunched up due to network congestion or
+    unreliability.
+
+* Fix bug where bunched-up messages could cause a time ordering violation in
+    the RTT event queue.
+    
+* Port Google client enhancements to standalone RTT client.
+
